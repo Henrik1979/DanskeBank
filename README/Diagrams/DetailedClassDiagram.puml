@@ -1,0 +1,231 @@
+@startuml DetailedClassDiagram
+
+package "DanskeBank.Guard" {
+  class Guard {
+    +Init : IGuard
+  }
+
+  interface IGuard {
+  }
+
+  class GuardAgainstEmptyAndWhiteSpaceExtension {
+    + GuardAgainstEmptyOrWhiteSpace(input: ReadOnlySpan<char>, parameterName: string?, message: string?): ReadOnlySpan<char>
+  }
+
+  class GuardAgainstFileSystemInfoNotFoundExtension {
+    + GuardAgainstFileSystemInfoNotFound(input: string, parameterName: string?, message: string?): string
+  }
+
+  class GuardAgainstNullExtensions {
+    + GuardAgainstNull(input: T, parameterName: string?, message: string?): T
+  }
+
+  IGuard <|--  Guard
+  IGuard *-- GuardAgainstEmptyAndWhiteSpaceExtension
+  IGuard *-- GuardAgainstFileSystemInfoNotFoundExtension
+  IGuard *-- GuardAgainstNullExtensions
+
+}
+
+package "DanskeBank.FileReader" {
+  interface IFileReader {
+    + ReadAllLinesAsync(filePath: string, cancellationToken: CancellationToken): IAsyncEnumerable<string>
+  }
+
+  class StreamFileReader {
+    - readonly guard: IGuard
+
+    + {constructor} StreamFileReader(guard: IGuard )
+    + ReadAllLinesAsync(filePath: string, cancellationToken: [EnumeratorCancellation] CancellationToken): IAsyncEnumerable<string>
+  }
+
+  IFileReader <|-- StreamFileReader
+  StreamFileReader *-- IGuard
+}
+
+package "DanskeBank.FileWriter"{
+  interface IFileWriter {
+    + WriteFileAsync(outputPath: string, fileName: string, values: IEnumerable<KeyValuePair<string, long>>, cancellationToken: CancellationToken) : Task
+  }
+
+  class StreamFileWriter {
+
+    - readonly guard: IGuard
+
+    + {constructor} StreamFileWriter(guard: IGuard )
+    + WriteFileAsync(outputPath: string, fileName: string, values: IEnumerable<KeyValuePair<string, long>>, cancellationToken: CancellationToken) : Task
+  }
+
+  IFileWriter <|-- StreamFileWriter
+  StreamFileWriter *-- IGuard
+}
+
+package "DanskeBank.LineSplitter" {
+  interface ILineSplitter {
+    + Split(line: string, separators: char[]): IEnumerable<string>
+  }
+
+  class LineSplitter {
+    - readonly guard: IGuard
+    - readonly stringSplitOptions: StringSplitOptions
+
+    + {constructor} LineSplitter(guard: IGuard, stringSplitOptions: StringSplitOptions = StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    + Split(line: string, separators: char[]): IEnumerable<string>
+  }
+
+  ILineSplitter <|-- LineSplitter
+  LineSplitter *-- IGuard
+}
+
+package "DanskeBank.WordCounter" {
+
+  interface IWordCounter {
+    + AddWord(word: string): void
+    + GetWordCount(): IEnumerable<KeyValuePair<string, long>>
+  }
+
+  class ConcurrentDictionaryWordCounter {
+    - readonly guard: IGuard
+    - readonly dictionary: ConcurrentDictionary<string, long>
+
+    + {constructor} ConcurrentDictionaryWordCounter(guard: IGuard)
+    + {constructor} ConcurrentDictionaryWordCounter(guard: IGuard, dictionary: ConcurrentDictionary<string, long>)
+    + AddWord(word: string): void
+    + GetWordCount(): IEnumerable<KeyValuePair<string, long>>
+  }
+
+  class TrieWordCounter {
+    - readonly root: TrieNode
+    - readonly Lock: object
+
+    + {constructor} TrieWordCounter()
+    + AddWord(word: string): void
+    + GetWordCount(): IEnumerable<KeyValuePair<string, long>>
+    - TraverseTrie(node: TrieNode, prefix: StringBuilder, wordCount: List<KeyValuePair<string, long>>): void
+  }
+
+  class TrieNode {
+    + Count: long
+    + Children: TrieNode[]
+  }
+
+  IWordCounter <|-- ConcurrentDictionaryWordCounter
+  ConcurrentDictionaryWordCounter *-- IGuard
+  IWordCounter <|-- TrieWordCounter
+  TrieWordCounter *-- TrieNode
+
+}
+
+package "DanskeBank.WordExcluder" {
+
+  interface IWordExcluder {
+    + IsExcluded(word: string) : bool
+    + IncrementExcludeWord(excludeWord: string) : void
+    + AddExcludeWord(excludeWord: params string[]) : void
+    + GetExcludeWordCount() : IEnumerable<KeyValuePair<string, long>>
+  }
+
+  class WordExcluder {
+    - readonly guard: IGuard
+    - readonly excludeWordCount: ConcurrentDictionary<string, long>
+
+    + {constructor} WordExcluder(guard: IGuard, excludeWordCount: ConcurrentDictionary<string, long>)
+    + {constructor} WordExcluder(guard: IGuard)
+    + IsExcluded(word: string) : bool
+    + IncrementExcludeWord(excludeWord: string) : void
+    + AddExcludeWord(excludeWord: params string[]) : void
+    + GetExcludeWordCount() : IEnumerable<KeyValuePair<string, long>>
+  }
+
+  IWordExcluder <|-- WordExcluder
+  WordExcluder *-- IGuard
+}
+
+package "DanskeBank.FileReaderManager" {
+
+  interface IFileReaderManager {
+    + Execute(channel: ChannelWriter<string>, filePaths: string[], cancel: CancellationToken): Task
+  }
+
+  class FileReaderManager {
+    - readonly guard: IGuard
+    - readonly fileReader: IFileReader
+    - readonly lineSplitter: ILineSplitter
+    - readonly separators: char[]
+
+    + {constructor} FileReaderManager(guard: IGuard, fileReader: IFileReader, lineSplitter: ILineSplitter, separators: char[])
+    + Execute(channel: ChannelWriter<string>, filePaths: string[], cancel: CancellationToken): Task
+  }
+
+  IFileReaderManager <|-- FileReaderManager
+  FileReaderManager *--  IFileReader
+  FileReaderManager *--  ILineSplitter
+}
+
+package "DanskeBank.FileWriterManager" {
+
+  interface IFileWriterManager {
+    +WriteWordCountFiles(outputPath: string, keyValuePairs: IEnumerable<KeyValuePair<string, long>>, cancellationToken: CancellationToken): Task
+    +WriteWordExcludeFile(outputPath: string, fileName: string, keyValuePairs: IEnumerable<KeyValuePair<string, long>>, cancellationToken: CancellationToken): Task
+  }
+
+  class FileWriterManager {
+    - readonly guard: IGuard
+    - readonly fileWriter: IFileWriter
+
+    + FileWriterManager(guard: IGuard, fileWriter: IFileWriter)
+    + WriteWordExcludeFile(outputPath: string, fileName: string, keyValuePairs: IEnumerable<KeyValuePair<string, long>>, cancellationToken: CancellationToken): Task
+    + WriteWordCountFiles(outputPath: string, keyValuePairs: IEnumerable<KeyValuePair<string, long>>, cancellationToken: CancellationToken): Task
+  }
+
+  IFileWriterManager <|-- FileWriterManager
+  FileWriterManager *-- IFileWriter
+  FileWriterManager *-- IGuard
+}
+
+package "DanskeBank.WordCountManager" {
+  interface IWordCountManager {
+    + Execute(channel: ChannelReader<string>, cancel: CancellationToken, wordCorrector?: Func<string, string>, channelFilter?: Func<string, bool>): Task
+    + GetWordCount(): IEnumerable<KeyValuePair<string, long>>
+    + GetExcludeWordCount(): IEnumerable<KeyValuePair<string, long>>
+  }
+
+  class WordCountManager {
+    - readonly guard: IGuard
+    - readonly wordCounter: IWordCounter
+    - readonly wordExcluder: IWordExcluder
+    + WordCountManager(guard: IGuard, wordExcluder: IWordExcluder, wordCounter: IWordCounter)
+    + Execute(channel: ChannelReader<string>, cancel: CancellationToken, wordCorrector?: Func<string, string>, channelFilter?: Func<string, bool>): Task
+    + GetWordCount(): IEnumerable<KeyValuePair<string, long>>
+    + GetExcludeWordCount(): IEnumerable<KeyValuePair<string, long>>
+  }
+
+  IWordCountManager <|-- WordCountManager
+  WordCountManager *-- IGuard
+  WordCountManager *-- IWordExcluder
+  WordCountManager *-- IWordCounter
+}
+
+package "DanskeBank.WordCountWorkFlow" {
+
+  interface IWordCountWorkFlow {
+    + Execute(channel: Channel<string>, configuration: Configuration, token: CancellationToken, wordCorrector?: Func<string, string>, channelReaderFilter?: Func<string, bool>): Task
+  }
+
+  class WordCountWorkFlow {
+    - readonly guard: IGuard
+    - readonly wordCountManager: IWordCountManager
+    - readonly fileReaderManager: IFileReaderManager
+    - readonly fileWriterManager: IFileWriterManager
+    + WordCountWorkFlow(guard: IGuard, wordCountManager: IWordCountManager, fileReaderManager: IFileReaderManager, fileWriterManager: IFileWriterManager)
+    + Execute(channel: Channel<string>, configuration: Configuration, token: CancellationToken, wordCorrector?: Func<string, string>, channelReaderFilter?: Func<string, bool>): Task
+  }
+
+  IWordCountWorkFlow <|-- WordCountWorkFlow
+  WordCountWorkFlow *-- IGuard
+  WordCountWorkFlow *-- IWordCountManager
+  WordCountWorkFlow *-- IFileReaderManager
+  WordCountWorkFlow *-- IFileWriterManager
+}
+
+@enduml

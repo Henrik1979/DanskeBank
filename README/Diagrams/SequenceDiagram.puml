@@ -1,0 +1,72 @@
+@startuml
+actor          Console                   as actor
+participant    WordCountWorkFlow         as flow
+participant    FileReaderManager         as readerManager
+participant    FileWriterManager         as writerManager
+participant    IFileReader               as reader
+participant    ILineSplitter             as splitter
+
+queue          Channel                   as ch
+
+participant    WordCountManager          as countermanager
+participant    IWordExcluder             as excluder
+participant    IWordCounter              as counter
+participant    IFileWriter               as fileWriter
+
+
+actor -> flow : Execute
+activate flow
+
+flow -> countermanager : async Execute
+activate countermanager
+flow <-- countermanager : Task
+
+loop until channel stream is closed
+  countermanager -> ch : ReadAllAsync
+  countermanager <-- ch : string word
+  countermanager -> countermanager : channelFilter
+  countermanager -> countermanager: wordCorrector
+  countermanager -> excluder : IsExcluded
+  countermanager <-- excluder : bool
+
+  alt Is true
+    countermanager -> excluder : IncrementExcludeWord
+  else Is False
+    countermanager -> counter : AddWord
+  end
+
+  destroy countermanager
+end
+
+flow -> readerManager: async Execute
+activate readerManager
+flow <- readerManager: Task
+
+loop Create task for each file
+
+  loop To end of file
+    readerManager -> reader : ReadAllLinesAsync
+    readerManager <- reader : string line
+    readerManager -> splitter : Split
+    readerManager <- splitter : IEnumerable<string> words
+
+    loop For every word in Line
+      readerManager  -> ch : WriteAsync
+    end
+  end
+end
+
+destroy readerManager
+
+flow -> flow : await FileReaderManager Task
+flow -> ch : Complete
+flow -> flow : await WordCountManager Task
+
+flow -> writerManager : WriteWordCountFiles
+writerManager -> fileWriter : WriteFileAsync
+
+flow -> writerManager : WriteWordExcludeFile
+writerManager -> fileWriter : WriteFileAsync
+
+deactivate ch
+@enduml

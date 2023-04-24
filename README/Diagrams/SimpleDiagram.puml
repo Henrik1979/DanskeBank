@@ -1,0 +1,149 @@
+@startuml DetailedClassDiagram
+
+package "DanskeBank.Guard" {
+  class Guard {
+  }
+
+  interface IGuard {
+  }
+
+  class GuardAgainstEmptyAndWhiteSpaceExtension {
+  }
+
+  class GuardAgainstFileSystemInfoNotFoundExtension {
+  }
+
+  class GuardAgainstNullExtensions {
+  }
+
+  IGuard <|--  Guard
+  IGuard *-- GuardAgainstEmptyAndWhiteSpaceExtension
+  IGuard *-- GuardAgainstFileSystemInfoNotFoundExtension
+  IGuard *-- GuardAgainstNullExtensions
+
+}
+
+package "DanskeBank.FileReader" {
+  interface IFileReader {
+  }
+
+  class StreamFileReader {
+  }
+
+  IFileReader <|-- StreamFileReader
+  StreamFileReader *-- IGuard
+}
+
+package "DanskeBank.FileWriter"{
+  interface IFileWriter {
+  }
+
+  class StreamFileWriter {
+  }
+
+  IFileWriter <|-- StreamFileWriter
+  StreamFileWriter *-- IGuard
+}
+
+package "DanskeBank.LineSplitter" {
+  interface ILineSplitter {
+  }
+
+  class LineSplitter {
+  }
+
+  ILineSplitter <|-- LineSplitter
+  LineSplitter *-- IGuard
+}
+
+package "DanskeBank.WordCounter" {
+
+  interface IWordCounter {
+  }
+
+  class ConcurrentDictionaryWordCounter {
+  }
+
+  class TrieWordCounter {
+  }
+
+  class TrieNode {
+  }
+
+  IWordCounter <|-- ConcurrentDictionaryWordCounter
+  ConcurrentDictionaryWordCounter *-- IGuard
+  IWordCounter <|-- TrieWordCounter
+  TrieWordCounter *-- TrieNode
+
+}
+
+package "DanskeBank.WordExcluder" {
+
+  interface IWordExcluder {
+  }
+
+  class WordExcluder {
+  }
+
+  IWordExcluder <|-- WordExcluder
+  WordExcluder *-- IGuard
+}
+
+package "DanskeBank.FileReaderManager" {
+
+  interface IFileReaderManager {
+  }
+
+  class FileReaderManager {
+  }
+
+  IFileReaderManager <|-- FileReaderManager
+  FileReaderManager *--  IFileReader
+  FileReaderManager *--  ILineSplitter
+}
+
+package "DanskeBank.FileWriterManager" {
+
+  interface IFileWriterManager {
+  }
+
+  class FileWriterManager {
+  }
+
+  IFileWriterManager <|-- FileWriterManager
+  FileWriterManager *-- IFileWriter
+  FileWriterManager *-- IGuard
+}
+
+package "DanskeBank.WordCountManager" {
+
+  interface IWordCountManager {
+  }
+
+  class WordCountManager {
+  }
+
+  IWordCountManager <|-- WordCountManager
+  WordCountManager *-- IGuard
+  WordCountManager *-- IWordExcluder
+  WordCountManager *-- IWordCounter
+
+}
+
+package "DanskeBank.WordCountWorkFlow" {
+  interface IWordCountWorkFlow {
+
+  }
+
+  class WordCountWorkFlow {
+  }
+
+  IWordCountWorkFlow <|-- WordCountWorkFlow
+  WordCountWorkFlow *-- IGuard
+  WordCountWorkFlow *-- IWordCountManager
+  WordCountWorkFlow *-- IFileReaderManager
+  WordCountWorkFlow *-- IFileWriterManager
+}
+
+
+@enduml
